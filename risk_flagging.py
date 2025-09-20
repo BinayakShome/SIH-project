@@ -5,19 +5,24 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
 
-# ---------- Load CSVs ----------
-students = pd.read_csv(r"c:\Users\KIIT0001\Documents\GitHub\SIH-project\data\students (2).csv")
-attendance = pd.read_csv(r"c:\Users\KIIT0001\Documents\GitHub\SIH-project\data\attendance (1).csv")
-marks = pd.read_csv(r"c:\Users\KIIT0001\Documents\GitHub\SIH-project\data\marks.csv")
-fees = pd.read_csv(r"c:\Users\KIIT0001\Documents\GitHub\SIH-project\data\fees (1).csv")
+# ---------- 1️⃣ Setup Relative Paths ----------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Current script directory
+DATA_DIR = os.path.join(BASE_DIR, "data")             # Data folder inside project
 
-# ---------- Merge datasets ----------
+# ---------- 2️⃣ Load CSVs ----------
+students = pd.read_csv(os.path.join(DATA_DIR, "students (2).csv"))
+attendance = pd.read_csv(os.path.join(DATA_DIR, "attendance (1).csv"))
+marks = pd.read_csv(os.path.join(DATA_DIR, "marks.csv"))
+fees = pd.read_csv(os.path.join(DATA_DIR, "fees (1).csv"))
+
+# ---------- 3️⃣ Merge Datasets ----------
 df = students.merge(attendance, on="student_id") \
              .merge(marks, on="student_id") \
              .merge(fees, on="student_id")
 
-# ---------- Rule-Based Risk Flagging ----------
+# ---------- 4️⃣ Rule-Based Risk Flagging ----------
 def rule_based_risk(row):
     score = 0
     if row["attendance_percent"] < 75:
@@ -36,9 +41,10 @@ def rule_based_risk(row):
 
 df["risk_rule"] = df.apply(rule_based_risk, axis=1)
 
-# ---------- ML Risk Prediction ----------
+# ---------- 5️⃣ ML Risk Prediction ----------
 X = df[["attendance_percent","avg_marks","failed_attempts","fee_paid_percent"]]
 y = df["risk_rule"]
+
 le = LabelEncoder()
 y_encoded = le.fit_transform(y)
 
@@ -50,12 +56,13 @@ df["risk_ml"] = le.inverse_transform(clf.predict(X))
 
 print(classification_report(y_test, y_pred, target_names=le.classes_))
 
-# ---------- Save final CSV ----------
-df.to_csv(r"c:\Users\KIIT0001\Documents\GitHub\SIH-project\data\final_with_risk.csv", index=False)
+# ---------- 6️⃣ Save Final CSV ----------
+output_file = os.path.join(DATA_DIR, "final_with_risk.csv")
+df.to_csv(output_file, index=False)
 
-# ---------- VISUALIZATIONS ----------
+# ---------- 7️⃣ VISUALIZATIONS ----------
 
-# 1️⃣ Bar chart: Number of students per risk level
+# 7a. Bar chart: Number of students per risk level
 plt.figure(figsize=(6,4))
 sns.countplot(data=df, x="risk_rule", order=["Low Risk","Medium Risk","High Risk"], palette="Set2")
 plt.title("Number of Students per Risk Level")
@@ -63,7 +70,7 @@ plt.xlabel("Risk Level")
 plt.ylabel("Number of Students")
 plt.show()
 
-# 2️⃣ Histogram: Attendance distribution colored by risk
+# 7b. Histogram: Attendance distribution by risk
 plt.figure(figsize=(8,4))
 sns.histplot(data=df, x="attendance_percent", hue="risk_rule", multiple="stack", palette="Set1", bins=20)
 plt.title("Attendance Distribution by Risk Level")
@@ -71,14 +78,14 @@ plt.xlabel("Attendance Percent")
 plt.ylabel("Count")
 plt.show()
 
-# 3️⃣ Heatmap: Correlation matrix
+# 7c. Heatmap: Correlation matrix
 plt.figure(figsize=(6,5))
 corr = df[["attendance_percent","avg_marks","failed_attempts","fee_paid_percent"]].corr()
 sns.heatmap(corr, annot=True, cmap="coolwarm")
 plt.title("Feature Correlation Matrix")
 plt.show()
 
-# 4️⃣ Stacked bar: Failed attempts vs risk
+# 7d. Stacked bar: Failed attempts vs risk
 plt.figure(figsize=(8,4))
 failed_risk = df.groupby(["failed_attempts","risk_rule"]).size().unstack(fill_value=0)
 failed_risk[["Low Risk","Medium Risk","High Risk"]].plot(kind="bar", stacked=True, colormap="Set3")
