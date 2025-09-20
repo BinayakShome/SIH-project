@@ -1,9 +1,12 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import classification_report
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# ---------- Load CSVs with absolute paths ----------
+# ---------- Load CSVs ----------
 students = pd.read_csv(r"c:\Users\KIIT0001\Documents\GitHub\SIH-project\data\students (2).csv")
 attendance = pd.read_csv(r"c:\Users\KIIT0001\Documents\GitHub\SIH-project\data\attendance (1).csv")
 marks = pd.read_csv(r"c:\Users\KIIT0001\Documents\GitHub\SIH-project\data\marks.csv")
@@ -28,43 +31,60 @@ def rule_based_risk(row):
         return "Low Risk"
     elif score == 2:
         return "Medium Risk"
-    else:  # score == 3
+    else:
         return "High Risk"
 
 df["risk_rule"] = df.apply(rule_based_risk, axis=1)
 
-print("===== SAMPLE Rule-Based Risk Flagging =====")
-print(df[['student_id','name','attendance_percent','avg_marks','failed_attempts','fee_paid_percent','risk_rule']].head(10))
-
-# ---------- Machine Learning Risk Prediction ----------
-# Features
+# ---------- ML Risk Prediction ----------
 X = df[["attendance_percent","avg_marks","failed_attempts","fee_paid_percent"]]
-y = df["risk_rule"]  # ML target with 3 classes: Low/Medium/High Risk
-
-# Encode string labels to numbers
-from sklearn.preprocessing import LabelEncoder
+y = df["risk_rule"]
 le = LabelEncoder()
-y_encoded = le.fit_transform(y)  # Low=0, Medium=1, High=2 (example mapping)
+y_encoded = le.fit_transform(y)
 
-# Train-test split
 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
-
-# Random Forest model
 clf = RandomForestClassifier(random_state=42)
 clf.fit(X_train, y_train)
-
 y_pred = clf.predict(X_test)
-
-print("\n===== ML Classification Report =====")
-print(classification_report(y_test, y_pred, target_names=le.classes_))
-
-# Add ML predictions to dataframe
 df["risk_ml"] = le.inverse_transform(clf.predict(X))
 
-print("\n===== SAMPLE ML-Based Predictions =====")
-print(df[['student_id','name','attendance_percent','avg_marks','failed_attempts','fee_paid_percent','risk_ml']].head(10))
+print(classification_report(y_test, y_pred, target_names=le.classes_))
 
-# ---------- Save final dataset ----------
+# ---------- Save final CSV ----------
 df.to_csv(r"c:\Users\KIIT0001\Documents\GitHub\SIH-project\data\final_with_risk.csv", index=False)
-print("\n✅ Merged dataset with risk flags saved as 'final_with_risk.csv'")
+
+# ---------- VISUALIZATIONS ----------
+
+# 1️⃣ Bar chart: Number of students per risk level
+plt.figure(figsize=(6,4))
+sns.countplot(data=df, x="risk_rule", order=["Low Risk","Medium Risk","High Risk"], palette="Set2")
+plt.title("Number of Students per Risk Level")
+plt.xlabel("Risk Level")
+plt.ylabel("Number of Students")
+plt.show()
+
+# 2️⃣ Histogram: Attendance distribution colored by risk
+plt.figure(figsize=(8,4))
+sns.histplot(data=df, x="attendance_percent", hue="risk_rule", multiple="stack", palette="Set1", bins=20)
+plt.title("Attendance Distribution by Risk Level")
+plt.xlabel("Attendance Percent")
+plt.ylabel("Count")
+plt.show()
+
+# 3️⃣ Heatmap: Correlation matrix
+plt.figure(figsize=(6,5))
+corr = df[["attendance_percent","avg_marks","failed_attempts","fee_paid_percent"]].corr()
+sns.heatmap(corr, annot=True, cmap="coolwarm")
+plt.title("Feature Correlation Matrix")
+plt.show()
+
+# 4️⃣ Stacked bar: Failed attempts vs risk
+plt.figure(figsize=(8,4))
+failed_risk = df.groupby(["failed_attempts","risk_rule"]).size().unstack(fill_value=0)
+failed_risk[["Low Risk","Medium Risk","High Risk"]].plot(kind="bar", stacked=True, colormap="Set3")
+plt.title("Failed Attempts vs Risk Level")
+plt.xlabel("Number of Failed Attempts")
+plt.ylabel("Number of Students")
+plt.show()
+
 
